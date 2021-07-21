@@ -33,6 +33,24 @@ async def cmd_ban(message: types.Message):
     await message.bot.delete_message(config.GROUP_ID, message.message_id)
     await message.bot.delete_message(config.GROUP_ID, message.reply_to_message.message_id)
 
+@dp.message_handler(commands=["dislike"], commands_prefix="!/")
+async def cmd_ban(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Эта комманда должна быть ответом на сообщение!")
+        return
+
+    await message.bot.delete_message(config.GROUP_ID, message.message_id)
+    await message.answer("{} {} - поставил дизлайк {} {}".format(message.from_user.first_name, message.from_user.last_name, message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name))
+
+@dp.message_handler(commands=["like"], commands_prefix="!/")
+async def cmd_ban(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Эта комманда должна быть ответом на сообщение!")
+        return
+
+    await message.bot.delete_message(config.GROUP_ID, message.message_id)
+    await message.answer("{} {} - поставил лайк {} {}".format(message.from_user.first_name, message.from_user.last_name, message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name))
+
 @dp.message_handler(is_admin=True, commands=["warn"], commands_prefix="!/")
 async def cmd_ban(message: types.Message):
     if not message.reply_to_message:

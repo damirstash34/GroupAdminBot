@@ -3,6 +3,7 @@ from fuzzywuzzy import fuzz as f
 from fuzzywuzzy import process as p
 import logging
 import config
+import json
 
 from filters import IsAdminFilter
 
@@ -13,7 +14,7 @@ dp = Dispatcher(bot)
 
 dp.filters_factory.bind(IsAdminFilter)
 
-@dp.message_handler(is_admin=True, commands=["kick"], commands_prefix="!/")
+@dp.message_handler(is_admin=True, commands=["ban"], commands_prefix="!/")
 async def cmd_ban(message: types.Message):
     if not message.reply_to_message:
         await message.reply("Эта комманда должна быть ответом на сообщение!")
@@ -33,32 +34,17 @@ async def cmd_ban(message: types.Message):
     await message.bot.delete_message(config.GROUP_ID, message.message_id)
     await message.bot.delete_message(config.GROUP_ID, message.reply_to_message.message_id)
 
-@dp.message_handler(commands=["dislike"], commands_prefix="!/")
-async def cmd_ban(message: types.Message):
-    if not message.reply_to_message:
-        await message.reply("Эта комманда должна быть ответом на сообщение!")
-        return
-
-    await message.bot.delete_message(config.GROUP_ID, message.message_id)
-    await message.answer("{} {} - поставил дизлайк {} {}".format(message.from_user.first_name, message.from_user.last_name, message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name))
-
-@dp.message_handler(commands=["like"], commands_prefix="!/")
-async def cmd_ban(message: types.Message):
-    if not message.reply_to_message:
-        await message.reply("Эта комманда должна быть ответом на сообщение!")
-        return
-
-    await message.bot.delete_message(config.GROUP_ID, message.message_id)
-    await message.answer("{} {} - поставил лайк {} {}".format(message.from_user.first_name, message.from_user.last_name, message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name))
-
 @dp.message_handler(is_admin=True, commands=["warn"], commands_prefix="!/")
 async def cmd_ban(message: types.Message):
     if not message.reply_to_message:
         await message.reply("Эта комманда должна быть ответом на сообщение!")
         return
 
+    username = message.from_user.username
+    stat = open("./stats/" + username + ".json", "r")
+    stats = json.load(stat)
     await message.bot.delete_message(config.GROUP_ID, message.message_id)
-    await message.answer("<b>{} {}</b> - вам было вынесено предупреждение!\nПосле нескольких предупреждений вы будете выгнаны".format(message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name), parse_mode="html")
+    await message.answer("<b>{} {}</b> - вам было вынесено предупреждение!\nПосле 3-х вы будете выгнаны!\n\n{}/3".format(message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name, stats["warns"]), parse_mode="html")
 
 @dp.message_handler(is_admin=True, commands=["chatstop"], commands_prefix="!/")
 async def stopchat(message: types.Message):
@@ -71,6 +57,91 @@ async def stopchat(message: types.Message):
     await message.delete()
     await message.answer("Чат запущен!\bПриятного общения :)")
     config.stoppedc = False
+
+@dp.message_handler(commands=["dislike"], commands_prefix="!/")
+async def cmd_ban(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Эта комманда должна быть ответом на сообщение!")
+        return
+
+    await message.bot.delete_message(config.GROUP_ID, message.message_id)
+    await message.answer("{} {} - поставил дизлайк {} {}".format(message.from_user.first_name, message.from_user.last_name, message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name))
+    stat_file = open("./stats/" + message.reply_to_message.from_user.username + ".json", "r+")
+    user_stat = json.load(stat_file)
+    user_stat["likes"] -= 1
+    stat_file.seek(0)
+    stat_file.truncate()
+    json.dump(user_stat, stat_file)
+    stat_file.close()
+
+@dp.message_handler(commands=["like"], commands_prefix="!/")
+async def cmd_ban(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Эта комманда должна быть ответом на сообщение!")
+        return
+
+    await message.bot.delete_message(config.GROUP_ID, message.message_id)
+    await message.answer("{} {} - поставил лайк {} {}".format(message.from_user.first_name, message.from_user.last_name, message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name))
+    stat_file = open("./stats/" + message.reply_to_message.from_user.username + ".json", "r+")
+    user_stat = json.load(stat_file)
+    user_stat["likes"] += 1
+    stat_file.seek(0)
+    stat_file.truncate()
+    json.dump(user_stat, stat_file)
+    stat_file.close()
+
+@dp.message_handler(commands=["stat"], commands_prefix="!/")
+async def statistic(message: types.Message):
+    group = message.chat.title
+    if message.chat.type != "private":
+        await message.answer("Чтобы узнать статистику пишите мне в личку комманду !stat")
+        print(message)
+        return
+
+    stat_file = open("./stats/" + message.from_user.username + ".json", "r+")
+    user_stat = json.load(stat_file)
+    likes = user_stat["likes"]
+    muted = user_stat["mute"]
+    warns = user_stat["warns"]
+    await message.answer("Ваша статистика в группе:\nНикнейм: <b>{}</b>\nЛайки: <b>{}</b>\nПредупреждения: <b>{}/3</b>\nСтатус мута: <b>{}</b>".format(message.from_user.username,str(likes), str(warns), str(muted)), parse_mode="html")
+    stat_file.close()
+
+@dp.message_handler(is_admin=True, commands=["mute"], commands_prefix="!/")
+async def mute(message: types.Message):
+    if message.reply_to_message:
+        await message.bot.delete_message(config.GROUP_ID, message.message_id)
+        stat_file = open("./stats/" + message.reply_to_message.from_user.username + ".json", "r+")
+        user_stat = json.load(stat_file)
+        user_stat["mute"] = 1
+        stat_file.seek(0)
+        stat_file.truncate()
+        json.dump(user_stat, stat_file)
+        stat_file.close()
+        await message.answer("Пользователь {} получил мут".format(message.reply_to_message.from_user.username))
+    else:
+        await message.bot.delete_message(config.GROUP_ID, message.message_id)
+        inv = message.text.replace("!mute","").strip()
+        stat_file = open("./stats/" + inv + ".json", "r+")
+        user_stat = json.load(stat_file)
+        user_stat["mute"] = 1
+        stat_file.seek(0)
+        stat_file.truncate()
+        json.dump(user_stat, stat_file)
+        stat_file.close()
+        await message.answer("Пользователь {} получил мут".format(inv))
+
+@dp.message_handler(is_admin=True, commands=["unmute"], commands_prefix="!/")
+async def mute(message: types.Message):
+    await message.bot.delete_message(config.GROUP_ID, message.message_id)
+    inv = message.text.replace("!unmute","").strip()
+    stat_file = open("./stats/" + inv + ".json", "r+")
+    user_stat = json.load(stat_file)
+    user_stat["mute"] = 0
+    stat_file.seek(0)
+    stat_file.truncate()
+    json.dump(user_stat, stat_file)
+    stat_file.close()
+    await message.answer("Пользователь {} может снова общаться!".format(inv))
 
 @dp.message_handler(commands=["yn"], commands_prefix="!/")
 async def yn(message: types.Message):
@@ -122,6 +193,37 @@ async def new_chat_member(message: types.Message):
 
 @dp.message_handler(content_types=["text"])
 async def text_handler(message: types.Message):
+
+    #reg new user
+    try:
+        username = message.from_user.username
+        stat = open("./stats/" + username + ".json", "r")
+        stats = json.load(stat)
+        if stats["mute"] == 1:
+            await message.delete()
+        if stats["warns"] >= 3:
+            await message.answer("{} {} - число предупреждений достигло 3-х!\nСейчас вы будете выгнаны!")
+            await message.bot.kick_chat_member(chat_id=config.GROUP_ID, user_id=message.from_user.id)
+
+
+        stat.close()
+    except:
+        username = message.from_user.username
+        user_stat = {
+            "username": message.from_user.username,
+            "id": message.from_user.id,
+            "mute": 0,
+            "likes": 0,
+            "warns": 0
+        }
+
+
+        new_user = open("./stats/" + username + ".json", "w")
+        json.dump(user_stat, new_user)
+        new_user.close()
+        await message.answer("Зарегистрирован новый пользователь - <b>{} {}</b>".format(message.from_user.first_name, message.from_user.last_name), parse_mode="html")
+
+
     #stop chat
     if config.stoppedc:
         await message.bot.delete_message(config.GROUP_ID, message.message_id)

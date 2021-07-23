@@ -4,6 +4,7 @@ from fuzzywuzzy import process as p
 import logging
 import config
 import json
+import os
 
 from filters import IsAdminFilter
 
@@ -187,6 +188,13 @@ async def iYes(message:types.Message):
     await message.delete()
     await message.answer("<b>{} {}</b> - несогласен".format(message.from_user.first_name, message.from_user.last_name), parse_mode="html")
 
+@dp.message_handler(commands=["delme"], commands_prefix="!/")
+async def delme(message: types.Message):
+    username = message.from_user.username
+    os.remove("./stats/" + username + ".json")
+    await message.delete()
+    await message.answer("Пользователь {} был удалён!".format(message.from_user.username))
+
 @dp.message_handler(content_types=["new_chat_members"])
 async def new_chat_member(message: types.Message):
     await message.delete()
@@ -222,6 +230,23 @@ async def text_handler(message: types.Message):
         json.dump(user_stat, new_user)
         new_user.close()
         await message.answer("Зарегистрирован новый пользователь - <b>{} {}</b>".format(message.from_user.first_name, message.from_user.last_name), parse_mode="html")
+        goose = open(config.helloIMG, "rb")
+        await bot.send_photo(message.chat.id, goose)
+        goose.close()
+
+    #hello
+    if f.ratio(message.text, "Привет") > 50:
+        goose = open(config.helloIMG, "rb")
+        await bot.send_photo(message.chat.id, goose)
+        goose.close()
+    if f.ratio(message.text, "Здравствуйте") > 50:
+        goose = open(config.helloIMG, "rb")
+        await bot.send_photo(message.chat.id, goose)
+        goose.close()
+    if f.ratio(message.text, "Дарова") > 50:
+        goose = open(config.helloIMG, "rb")
+        await bot.send_photo(message.chat.id, goose)
+        goose.close()
 
 
     #stop chat
@@ -233,7 +258,7 @@ async def text_handler(message: types.Message):
         await message.answer("Мне показалось что вы хотите есть, вот варианты:\n1.Заказать пиццу на Рустерс, Пекарня34, Диливери Клаб, Яндекс Еда, Жар Пицца\n2. Купить шаурму\n3.Заказать роллы или вок на СушиВёсла, СушиДаром, Яндекс Еда, Диливери клаб\n3. Самое простое отварить пельмеши :)")
 
     #filter of messages
-    if f.ratio(message.text, "блять") > 35 or "блять" in message.text:
+    msg_filter = """if f.ratio(message.text, "блять") > 35 or "блять" in message.text:
         await message.delete()
     elif f.ratio(message.text, "сука") > 35 or "сука" in message.text:
         await message.delete()
@@ -266,7 +291,7 @@ async def text_handler(message: types.Message):
     if f.ratio(message.text, "suck") > 35 or "suck" in message.text:
         await message.delete()
     if f.ratio(message.text, "жопа") > 35 or "жопа" in message.text:
-        await message.delete()
+        await message.delete()"""
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)

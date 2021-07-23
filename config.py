@@ -1,4 +1,4 @@
-TOKEN = "1903563838:AAGPbpBt2Ww1nGugJYu-v79X-CYaqkaVpws"
-GROUP_ID = -1001519524581
+TOKEN = ""
+GROUP_ID = 
 stoppedc = False
 helloIMG = "./hello.jpg"

@@ -35,6 +35,22 @@ async def cmd_ban(message: types.Message):
     await message.bot.delete_message(config.GROUP_ID, message.message_id)
     await message.bot.delete_message(config.GROUP_ID, message.reply_to_message.message_id)
 
+@dp.message_handler(commands=["del"], commands_prefix="!/")
+async def cmd_ban(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Эта комманда должна быть ответом на сообщение!")
+        return
+    
+    stat = open("./stas/"+message.from_user.username+".json", "r+")
+    stats = json.load(stat)
+    if stats["status"] < 1:
+        await bot.send_message(message.from_user.id, "У вас нет на это прав!")
+        return
+
+    stat.close()
+    await message.bot.delete_message(config.GROUP_ID, message.message_id)
+    await message.bot.delete_message(config.GROUP_ID, message.reply_to_message.message_id)
+
 @dp.message_handler(is_admin=True, commands=["warn"], commands_prefix="!/")
 async def cmd_ban(message: types.Message):
     if not message.reply_to_message:
@@ -44,8 +60,11 @@ async def cmd_ban(message: types.Message):
     username = message.from_user.username
     stat = open("./stats/" + username + ".json", "r")
     stats = json.load(stat)
+    wrn_counts = stats["warns"]
+    stats["warns"] = wrn_counts
     await message.bot.delete_message(config.GROUP_ID, message.message_id)
     await message.answer("<b>{} {}</b> - вам было вынесено предупреждение!\nПосле 3-х вы будете выгнаны!\n\n{}/3".format(message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name, stats["warns"]), parse_mode="html")
+    stat.close()
 
 @dp.message_handler(is_admin=True, commands=["chatstop"], commands_prefix="!/")
 async def stopchat(message: types.Message):
@@ -60,7 +79,7 @@ async def stopchat(message: types.Message):
     config.stoppedc = False
 
 @dp.message_handler(commands=["dislike"], commands_prefix="!/")
-async def cmd_ban(message: types.Message):
+async def dislikeUser(message: types.Message):
     if not message.reply_to_message:
         await message.reply("Эта комманда должна быть ответом на сообщение!")
         return
@@ -76,7 +95,7 @@ async def cmd_ban(message: types.Message):
     stat_file.close()
 
 @dp.message_handler(commands=["like"], commands_prefix="!/")
-async def cmd_ban(message: types.Message):
+async def likeUser(message: types.Message):
     if not message.reply_to_message:
         await message.reply("Эта комманда должна быть ответом на сообщение!")
         return
@@ -131,8 +150,61 @@ async def mute(message: types.Message):
         stat_file.close()
         await message.answer("Пользователь {} получил мут".format(inv))
 
+@dp.message_handler(commands=["mute"], commands_prefix="!/")
+async def mute(message: types.Message):
+    stat = open("./stas/"+message.from_user.username+".json", "r+")
+    stats = json.load(stat)
+    if stats["status"] < 2:
+        await bot.send_message(message.from_user.id, "У вас нет на это прав!")
+        return
+
+    stat.close()
+
+    if message.reply_to_message:
+        await message.bot.delete_message(config.GROUP_ID, message.message_id)
+        stat_file = open("./stats/" + message.reply_to_message.from_user.username + ".json", "r+")
+        user_stat = json.load(stat_file)
+        user_stat["mute"] = 1
+        stat_file.seek(0)
+        stat_file.truncate()
+        json.dump(user_stat, stat_file)
+        stat_file.close()
+        await message.answer("Пользователь {} получил мут".format(message.reply_to_message.from_user.username))
+    else:
+        await message.bot.delete_message(config.GROUP_ID, message.message_id)
+        inv = message.text.replace("!mute","").strip()
+        stat_file = open("./stats/" + inv + ".json", "r+")
+        user_stat = json.load(stat_file)
+        user_stat["mute"] = 1
+        stat_file.seek(0)
+        stat_file.truncate()
+        json.dump(user_stat, stat_file)
+        stat_file.close()
+        await message.answer("Пользователь {} получил мут".format(inv))
+
 @dp.message_handler(is_admin=True, commands=["unmute"], commands_prefix="!/")
 async def mute(message: types.Message):
+    await message.bot.delete_message(config.GROUP_ID, message.message_id)
+    inv = message.text.replace("!unmute","").strip()
+    stat_file = open("./stats/" + inv + ".json", "r+")
+    user_stat = json.load(stat_file)
+    user_stat["mute"] = 0
+    stat_file.seek(0)
+    stat_file.truncate()
+    json.dump(user_stat, stat_file)
+    stat_file.close()
+    await message.answer("Пользователь {} может снова общаться!".format(inv))
+
+@dp.message_handler(commands=["unmute"], commands_prefix="!/")
+async def mute(message: types.Message):
+    stat = open("./stas/"+message.from_user.username+".json", "r+")
+    stats = json.load(stat)
+    if stats["status"] < 2:
+        await bot.send_message(message.from_user.id, "У вас нет на это прав!")
+        return
+
+    stat.close()
+    
     await message.bot.delete_message(config.GROUP_ID, message.message_id)
     inv = message.text.replace("!unmute","").strip()
     stat_file = open("./stats/" + inv + ".json", "r+")
@@ -152,6 +224,23 @@ async def yn(message: types.Message):
     inv = message.text.replace("!yn","").strip()
     await message.delete()
     await message.answer("<b>{} {}</b> предлагает:\n{}\n\nВы можете предложить своё коммандой !yn (предложение)".format(message.from_user.first_name, message.from_user.last_name, inv), parse_mode="html", reply_markup=inline_kb1)
+
+@dp.message_handler(is_admin=True, commands=["lvl"], commands_prefix="!/")
+async def chnglevel(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Эта комманда должна быть ответом на сообщение!")
+        return
+    
+    inv = message.text.replace("!lvl","").strip()
+    stat_file = open("./stats/"+message.reply_to_message.from_user.username+".json", "r+")
+    user_stat = json.load(stat_file)
+    user_stat["status"] = inv
+    stat_file.seek(0)
+    stat_file.truncate()
+    json.dump(user_stat, stat_file)
+    await message.delete()
+    await message.answer("Теперь у пользователя {} {} привилегия = {}".format(message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name, inv))
+    stat_file.close()
 
 @dp.message_handler(commands=["post"], commands_prefix="!/")
 async def post(message: types.Message):
@@ -222,11 +311,17 @@ async def text_handler(message: types.Message):
             "id": message.from_user.id,
             "mute": 0,
             "likes": 0,
-            "warns": 0
+            "warns": 0,
+            "status": 0
         }
 
+        # status:
+        # 0 - member
+        # 1 - deleter
+        # 2 - muter
 
-        new_user = open("./stats/" + username + ".json", "w")
+
+        new_user = open("./stats/" + username + ".json", "r+")
         json.dump(user_stat, new_user)
         new_user.close()
         await message.answer("Зарегистрирован новый пользователь - <b>{} {}</b>".format(message.from_user.first_name, message.from_user.last_name), parse_mode="html")

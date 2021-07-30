@@ -5,6 +5,7 @@ import logging
 import config
 import json
 import os
+import asyncio
 
 from filters import IsAdminFilter
 
@@ -41,7 +42,7 @@ async def cmd_ban(message: types.Message):
         await message.reply("Эта комманда должна быть ответом на сообщение!")
         return
     
-    stat = open("./stas/"+message.from_user.username+".json", "r+")
+    stat = open("./stats/"+str(message.from_user.id)+".json", "r+")
     stats = json.load(stat)
     if stats["status"] < 1:
         await bot.send_message(message.from_user.id, "У вас нет на это прав!")
@@ -57,8 +58,8 @@ async def cmd_ban(message: types.Message):
         await message.reply("Эта комманда должна быть ответом на сообщение!")
         return
 
-    username = message.from_user.username
-    stat = open("./stats/" + username + ".json", "r")
+    username = message.from_user.id
+    stat = open("./stats/" + str(username) + ".json", "r")
     stats = json.load(stat)
     wrn_counts = stats["warns"]
     stats["warns"] = wrn_counts
@@ -86,7 +87,7 @@ async def dislikeUser(message: types.Message):
 
     await message.bot.delete_message(config.GROUP_ID, message.message_id)
     await message.answer("{} {} - поставил дизлайк {} {}".format(message.from_user.first_name, message.from_user.last_name, message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name))
-    stat_file = open("./stats/" + message.reply_to_message.from_user.username + ".json", "r+")
+    stat_file = open("./stats/" + str(message.reply_to_message.from_user.id) + ".json", "r+")
     user_stat = json.load(stat_file)
     user_stat["likes"] -= 1
     stat_file.seek(0)
@@ -102,7 +103,7 @@ async def likeUser(message: types.Message):
 
     await message.bot.delete_message(config.GROUP_ID, message.message_id)
     await message.answer("{} {} - поставил лайк {} {}".format(message.from_user.first_name, message.from_user.last_name, message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name))
-    stat_file = open("./stats/" + message.reply_to_message.from_user.username + ".json", "r+")
+    stat_file = open("./stats/" + str(message.reply_to_message.from_user.id) + ".json", "r+")
     user_stat = json.load(stat_file)
     user_stat["likes"] += 1
     stat_file.seek(0)
@@ -113,24 +114,20 @@ async def likeUser(message: types.Message):
 @dp.message_handler(commands=["stat"], commands_prefix="!/")
 async def statistic(message: types.Message):
     group = message.chat.title
-    if message.chat.type != "private":
-        await message.answer("Чтобы узнать статистику пишите мне в личку комманду !stat")
-        print(message)
-        return
-
-    stat_file = open("./stats/" + message.from_user.username + ".json", "r+")
+    stat_file = open("./stats/" + str(message.from_user.id) + ".json", "r+")
     user_stat = json.load(stat_file)
     likes = user_stat["likes"]
     muted = user_stat["mute"]
     warns = user_stat["warns"]
-    await message.answer("Ваша статистика в группе:\nНикнейм: <b>{}</b>\nЛайки: <b>{}</b>\nПредупреждения: <b>{}/3</b>\nСтатус мута: <b>{}</b>".format(message.from_user.username,str(likes), str(warns), str(muted)), parse_mode="html")
+    await message.delete()
+    await bot.send_message(message.from_user.id, "Ваша статистика в группе <u>{}</u>:\nНикнейм: <b>{}</b>\nЛайки: <b>{}</b>\nПредупреждения: <b>{}/3</b>\nСтатус мута: <b>{}</b>".format(group, message.from_user.username,str(likes), str(warns), str(muted)), parse_mode="html")
     stat_file.close()
 
 @dp.message_handler(is_admin=True, commands=["mute"], commands_prefix="!/")
 async def mute(message: types.Message):
     if message.reply_to_message:
         await message.bot.delete_message(config.GROUP_ID, message.message_id)
-        stat_file = open("./stats/" + message.reply_to_message.from_user.username + ".json", "r+")
+        stat_file = open("./stats/" + str(message.reply_to_message.from_user.id) + ".json", "r+")
         user_stat = json.load(stat_file)
         user_stat["mute"] = 1
         stat_file.seek(0)
@@ -152,7 +149,7 @@ async def mute(message: types.Message):
 
 @dp.message_handler(commands=["mute"], commands_prefix="!/")
 async def mute(message: types.Message):
-    stat = open("./stas/"+message.from_user.username+".json", "r+")
+    stat = open("./stas/"+str(message.from_user.id)+".json", "r+")
     stats = json.load(stat)
     if stats["status"] < 2:
         await bot.send_message(message.from_user.id, "У вас нет на это прав!")
@@ -162,7 +159,7 @@ async def mute(message: types.Message):
 
     if message.reply_to_message:
         await message.bot.delete_message(config.GROUP_ID, message.message_id)
-        stat_file = open("./stats/" + message.reply_to_message.from_user.username + ".json", "r+")
+        stat_file = open("./stats/" + str(message.reply_to_message.from_user.id) + ".json", "r+")
         user_stat = json.load(stat_file)
         user_stat["mute"] = 1
         stat_file.seek(0)
@@ -197,7 +194,7 @@ async def mute(message: types.Message):
 
 @dp.message_handler(commands=["unmute"], commands_prefix="!/")
 async def mute(message: types.Message):
-    stat = open("./stas/"+message.from_user.username+".json", "r+")
+    stat = open("./stas/"+str(message.from_user.id)+".json", "r+")
     stats = json.load(stat)
     if stats["status"] < 2:
         await bot.send_message(message.from_user.id, "У вас нет на это прав!")
@@ -232,14 +229,22 @@ async def chnglevel(message: types.Message):
         return
     
     inv = message.text.replace("!lvl","").strip()
-    stat_file = open("./stats/"+message.reply_to_message.from_user.username+".json", "r+")
+    stat_file = open("./stats/"+str(message.reply_to_message.from_user.id)+".json", "r+")
     user_stat = json.load(stat_file)
-    user_stat["status"] = inv
+    user_stat["status"] = str(inv)
     stat_file.seek(0)
     stat_file.truncate()
     json.dump(user_stat, stat_file)
     await message.delete()
-    await message.answer("Теперь у пользователя {} {} привилегия = {}".format(message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name, inv))
+    if inv == "1":
+        await message.answer("Теперь у пользователя {} {} привилегия = DELETER\nDELETER - может удалять сообщения".format(message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name))
+    elif inv == "2":
+        await message.answer("Теперь у пользователя {} {} привилегия = MUTER\nMUTER - может удалять сообщения + вводить пользователей в режим чтения".format(message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name))
+    elif inv == "0":
+        await message.answer("Теперь у пользователя {} {} привилегия = MEMBER\n MEMBER может только общаться в чате".format(message.reply_to_message.from_user.first_name, message.reply_to_message.from_user.last_name))
+    else:
+        await bot.send_message(message.from_user.id, "Неизвестный уровень {}!".format(inv))
+    
     stat_file.close()
 
 @dp.message_handler(commands=["post"], commands_prefix="!/")
@@ -279,10 +284,26 @@ async def iYes(message:types.Message):
 
 @dp.message_handler(commands=["delme"], commands_prefix="!/")
 async def delme(message: types.Message):
-    username = message.from_user.username
-    os.remove("./stats/" + username + ".json")
+    username = message.from_user.id
+    os.remove("./stats/" + str(username) + ".json")
     await message.delete()
     await message.answer("Пользователь {} был удалён!".format(message.from_user.username))
+
+@dp.message_handler(commands=['report', 'rep'], commands_prefix="!/")
+async def report_user(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Эта комманда должна быть ответом на сообщение!")
+        return
+    
+    rep_owner = message.from_user.first_name + " " + message.from_user.last_name + " - " + str(message.from_user.id)
+    rep_cut = message.text.replace("!report","").strip()
+    rep_n = rep_cut.replace("!rep", "").strip()
+    to_rep = message.reply_to_message.from_user.first_name + " " + message.reply_to_message.from_user.last_name + " - " + str(message.reply_to_message.from_user.id)
+    rep_msg = "Получен репорт от: <b>{}</b>\nРепорт на: <b>{}</b>\nПричина репорта: <em>{}</em>".format(rep_owner, to_rep, rep_n)
+    await message.delete()
+    await bot.send_message(config.forReportId, rep_msg, parse_mode="html")
+    
+
 
 @dp.message_handler(content_types=["new_chat_members"])
 async def new_chat_member(message: types.Message):
@@ -293,8 +314,8 @@ async def text_handler(message: types.Message):
 
     #reg new user
     try:
-        username = message.from_user.username
-        stat = open("./stats/" + username + ".json", "r")
+        userid = message.from_user.id
+        stat = open("./stats/" + str(userid) + ".json", "r")
         stats = json.load(stat)
         if stats["mute"] == 1:
             await message.delete()
@@ -305,10 +326,10 @@ async def text_handler(message: types.Message):
 
         stat.close()
     except:
-        username = message.from_user.username
+        userid = message.from_user.id
         user_stat = {
             "username": message.from_user.username,
-            "id": message.from_user.id,
+            "id": userid,
             "mute": 0,
             "likes": 0,
             "warns": 0,
@@ -321,7 +342,7 @@ async def text_handler(message: types.Message):
         # 2 - muter
 
 
-        new_user = open("./stats/" + username + ".json", "r+")
+        new_user = open("./stats/" + str(userid) + ".json", "w+")
         json.dump(user_stat, new_user)
         new_user.close()
         await message.answer("Зарегистрирован новый пользователь - <b>{} {}</b>".format(message.from_user.first_name, message.from_user.last_name), parse_mode="html")
@@ -388,5 +409,7 @@ async def text_handler(message: types.Message):
     if f.ratio(message.text, "жопа") > 35 or "жопа" in message.text:
         await message.delete()"""
 
+
+#long polling
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
